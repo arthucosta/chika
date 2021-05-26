@@ -21,8 +21,6 @@ defmodule Chika.Commands.LOL do
       {:error, :unknown_error} ->
         Cogs.say("Unkown error, try later.")
       {:ok, summoner} ->
-        IO.puts "chegou!!"
-        IO.inspect(summoner)
         Embed.send(build_embed(summoner))
     end
   end
