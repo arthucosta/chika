@@ -1,42 +1,42 @@
 defmodule Chika.Commands.LOL do
   use Alchemy.Cogs
-  alias Chika.Utils.Args, as: Args
-  require Alchemy.Embed, as: Embed
+  alias Chika.Utils.{Args,Lol}
+  alias Alchemy.Embed
 
-  Cogs.def summoner do
-    args = Args.parse(message.content)
-    region = Enum.at(args, 0)
+  import Embed
 
-    username =
-      Enum.slice(args, 1..2)
-      |> Enum.join(" ")
+   Cogs.def summoner do
+     args = Args.parse(message.content)
+     region = Enum.at(args, 0)
 
-    case HTTPoison.get(
-           "https://#{region}.api.riotgames.com/lol/summoner/v4/summoners/by-name/#{username}?api_key=#{
-             Application.fetch_env!(:chika, :riot_key)
-           }"
-         ) do
-      {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
-        summoner = Poison.Parser.parse!(body, %{keys: :atoms})
-        revisionDate = DateTime.from_unix!(summoner.revisionDate, :millisecond)
+     username =
+       Enum.slice(args, 1..2)
+       |> Enum.join(" ")
 
-        %Embed{
-          color: 0x36393E,
-          description:
-            "Name: **#{summoner.name}**(#{summoner.id})\nLevel: **#{summoner.summonerLevel}**\nRevision Date: **#{
-              revisionDate
-            }**",
-          thumbnail: %{
-            url:
-              "http://ddragon.leagueoflegends.com/cdn/6.24.1/img/profileicon/#{
-                summoner.profileIconId
-              }.png"
-          }
-        }
-        |> Embed.send()
-
-      {:ok, %HTTPoison.Response{status_code: 404}} ->
+    case Lol.find_summoner(region, username) do
+      {:error, :riot_key_not_provided} ->
+        Cogs.say("Command is not currently available, try later.")
+      {:error, :unknown_user} ->
         Cogs.say("Unknown user")
+      {:error, :unknown_error} ->
+        Cogs.say("Unkown error, try later.")
+      {:ok, summoner} ->
+        Embed.send(build_embed(summoner))
     end
+  end
+
+  defp build_embed (%{
+    id: id,
+    name: name,
+    profileIconId: iconId,
+    revisionDate: date,
+    summonerLevel: level,
+    }) do
+    revisionDate = DateTime.from_unix!(date, :millisecond)
+
+    %Embed{}
+      |> color(0x36393E)
+      |> thumbnail(Lol.profile_icon_url(iconId))
+      |> description("Name: **#{name}** (#{id})\nLevel: **#{level}**\nRevision Date: **#{revisionDate}**")
   end
 end
